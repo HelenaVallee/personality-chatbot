@@ -1,0 +1,28 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+env/
+.env
+
+# Flask session files
+flask_session/
+
+# Generated images
+static/images/*
+!static/images/.gitkeep
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+
+# API keys and sensitive information
+.env

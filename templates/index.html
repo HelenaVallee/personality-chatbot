@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personality Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .chat-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: 400px;
+            overflow-y: auto;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            text-align: right;
+        }
+        .bot-message {
+            background-color: #f1f1f1;
+            margin-right: 20%;
+        }
+        .bot-message img {
+            display: block;
+            max-width: 100%;
+            margin-top: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .input-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .settings {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .settings label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .settings input, .settings select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .personality-options {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        .personality-option {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            flex-basis: 22%;
+            text-align: center;
+        }
+        .personality-option.active {
+            background-color: #e3f2fd;
+            border-color: #2196f3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Personality Chatbot</h1>
+    
+    <div class="settings">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0;">Settings</h3>
+            <div class="demo-mode-toggle">
+                <label for="demo-mode" style="display: inline-block; margin-right: 10px;">Demo Mode:</label>
+                <input type="checkbox" id="demo-mode" {% if demo_mode %}checked{% endif %} onclick="toggleDemoMode()">
+                <span style="font-size: 0.8em; color: #666;">(No API key needed)</span>
+            </div>
+        </div>
+        
+        <div id="api-key-section" {% if demo_mode %}style="opacity: 0.5;"{% endif %}>
+            <label for="api-key">Together.ai API Key:</label>
+            <div style="display: flex; margin-bottom: 15px;">
+                <input type="password" id="api-key" value="{{ api_key }}" placeholder="Enter your API key here" style="flex-grow: 1; margin-right: 10px; margin-bottom: 0;" {% if demo_mode %}disabled{% endif %}>
+                <button id="test-api-key" style="white-space: nowrap;" {% if demo_mode %}disabled{% endif %} onclick="testApiKey()">Test API Key</button>
+            </div>
+            <p style="font-size: 0.8em; color: #666; margin-top: -10px;">
+                You need a valid Together.ai API key. Get one at <a href="https://together.ai" target="_blank">together.ai</a>
+            </p>
+        </div>
+        
+        <label>Select Personality:</label>
+        <div class="personality-options">
+            <div class="personality-option{% if personality == 1 %} active{% endif %}" data-personality="1" onclick="setPersonality(1)">
+                Helpful Assistant
+            </div>
+            <div class="personality-option{% if personality == 2 %} active{% endif %}" data-personality="2" onclick="setPersonality(2)">
+                Sassy 90s Teen
+            </div>
+            <div class="personality-option{% if personality == 3 %} active{% endif %}" data-personality="3" onclick="setPersonality(3)">
+                Emotional Pirate
+            </div>
+            <div class="personality-option{% if personality == 4 %} active{% endif %}" data-personality="4" onclick="setPersonality(4)">
+                MJ Therapist
+            </div>
+        </div>
+    </div>
+    
+    <div class="chat-container" id="chat-container">
+        {% for message in messages %}
+        <div class="message user-message">{{ message.user }}</div>
+        <div class="message bot-message">{{ message.bot }}</div>
+        {% endfor %}
+    </div>
+    
+    <div class="input-container">
+        <input type="text" id="message-input" placeholder="Type your message here..." onkeypress="if(event.key === 'Enter') sendMessage()">
+        <button id="send-button" onclick="sendMessage()">Send</button>
+    </div>
+    
+    <button id="clear-button" onclick="clearChat()">Clear Chat</button>
+    
+    <script>
+        // Get DOM elements
+        const chatContainer = document.getElementById('chat-container');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const clearButton = document.getElementById('clear-button');
+        const apiKeyInput = document.getElementById('api-key');
+        const personalityOptions = document.querySelectorAll('.personality-option');
+        
+        // Current settings
+        let currentPersonality = {{ personality }};
+        let demoMode = {% if demo_mode %}true{% else %}false{% endif %};
+        
+        // Function to add a message to the chat
+        function addMessage(message, isUser) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+            messageElement.classList.add(isUser ? 'user-message' : 'bot-message');
+            
+            // Check if the message contains an image tag
+            const imgRegex = /<img-(/static/images/[^>]+)>/;
+            const match = message.match(imgRegex);
+            
+            if (match) {
+                // Replace the image tag with an actual image element
+                const imgPath = match[1];
+                const textPart = message.replace(imgRegex, '').trim();
+                
+                // Add text part if it exists
+                if (textPart) {
+                    const textElement = document.createElement('p');
+                    textElement.textContent = textPart;
+                    messageElement.appendChild(textElement);
+                }
+                
+                // Add the image
+                const imgElement = document.createElement('img');
+                imgElement.src = imgPath;
+                imgElement.alt = 'Generated image';
+                imgElement.style.maxWidth = '100%';
+                imgElement.style.borderRadius = '5px';
+                imgElement.style.marginTop = '10px';
+                messageElement.appendChild(imgElement);
+            } else {
+                // Regular text message
+                messageElement.textContent = message;
+            }
+            
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // Function to test API key
+        async function testApiKey() {
+            console.log('Test API Key button clicked');
+            const apiKey = apiKeyInput.value.trim();
+            if (!apiKey) {
+                alert('Please enter an API key to test');
+                return;
+            }
+            
+            try {
+                alert('Testing API key... This may take a moment.');
+                const response = await fetch('/test_api_key', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_key: apiKey
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('API key is valid!');
+                } else {
+                    alert(`API key validation failed: ${data.message}`);
+                }
+            } catch (error) {
+                console.error('Error testing API key:', error);
+                alert('Error testing API key. Please try again.');
+            }
+        }
+        
+        // Function to send a message
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage(message, true);
+            messageInput.value = '';
+            
+            // Get API key
+            const apiKey = apiKeyInput.value.trim();
+            
+            // Only check for API key if not in demo mode
+            if (!demoMode && !apiKey) {
+                addMessage('Error: Please enter your Together.ai API key in the settings section or enable Demo Mode.', false);
+                return;
+            }
+            
+            try {
+                // Send message to server
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        api_key: apiKey,
+                        personality: currentPersonality,
+                        demo_mode: demoMode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                // Add bot response to chat
+                addMessage(data.response, false);
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addMessage('Error: Could not get a response from the server.', false);
+            }
+        }
+        
+        // Function to clear the chat
+        async function clearChat() {
+            chatContainer.innerHTML = '';
+            
+            try {
+                await fetch('/clear_chat', {
+                    method: 'POST'
+                });
+            } catch (error) {
+                console.error('Error clearing chat:', error);
+            }
+        }
+        
+        // Function to set personality
+        async function setPersonality(personality) {
+            currentPersonality = personality;
+            
+            // Update UI
+            personalityOptions.forEach(option => {
+                if (option.dataset.personality === personality.toString()) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+            
+            try {
+                await fetch('/set_personality', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        personality: personality
+                    })
+                });
+            } catch (error) {
+                console.error('Error setting personality:', error);
+            }
+        }
+        
+        // Function to toggle demo mode
+        async function toggleDemoMode() {
+            demoMode = demoModeCheckbox.checked;
+            
+            // Update UI
+            const apiKeySection = document.getElementById('api-key-section');
+            if (demoMode) {
+                apiKeySection.style.opacity = '0.5';
+                apiKeyInput.disabled = true;
+                document.getElementById('test-api-key').disabled = true;
+            } else {
+                apiKeySection.style.opacity = '1';
+                apiKeyInput.disabled = false;
+                document.getElementById('test-api-key').disabled = false;
+            }
+            
+            try {
+                await fetch('/toggle_demo_mode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        demo_mode: demoMode
+                    })
+                });
+            } catch (error) {
+                console.error('Error toggling demo mode:', error);
+            }
+        }
+        
+        // Make sure all DOM elements are properly loaded before adding event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM fully loaded');
+            
+            // Re-fetch elements to ensure they're available
+            const sendButton = document.getElementById('send-button');
+            const messageInput = document.getElementById('message-input');
+            const clearButton = document.getElementById('clear-button');
+            const testApiKeyButton = document.getElementById('test-api-key');
+            const demoModeCheckbox = document.getElementById('demo-mode');
+            const personalityOptions = document.querySelectorAll('.personality-option');
+            
+            // Add event listeners
+            if (sendButton) {
+                console.log('Send button found, adding listener');
+                sendButton.addEventListener('click', sendMessage);
+            }
+            
+            if (messageInput) {
+                console.log('Message input found, adding listener');
+                messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        sendMessage();
+                    }
+                });
+            }
+            
+            if (clearButton) {
+                console.log('Clear button found, adding listener');
+                clearButton.addEventListener('click', clearChat);
+            }
+            
+            if (testApiKeyButton) {
+                console.log('Test API key button found, adding listener');
+                testApiKeyButton.addEventListener('click', testApiKey);
+            }
+            
+            if (demoModeCheckbox) {
+                console.log('Demo mode checkbox found, adding listener');
+                demoModeCheckbox.addEventListener('change', toggleDemoMode);
+            }
+            
+            // Add personality selection listeners
+            personalityOptions.forEach(option => {
+                console.log('Adding listener to personality option');
+                option.addEventListener('click', () => {
+                    setPersonality(parseInt(option.dataset.personality));
+                });
+            });
+        });
+        
+        // Immediate event listeners as a fallback
+        const sendButton = document.getElementById('send-button');
+        const messageInput = document.getElementById('message-input');
+        const clearButton = document.getElementById('clear-button');
+        const testApiKeyButton = document.getElementById('test-api-key');
+        const demoModeCheckbox = document.getElementById('demo-mode');
+        
+        if (sendButton) sendButton.addEventListener('click', sendMessage);
+        if (messageInput) messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+        if (clearButton) clearButton.addEventListener('click', clearChat);
+        if (testApiKeyButton) testApiKeyButton.addEventListener('click', testApiKey);
+        if (demoModeCheckbox) demoModeCheckbox.addEventListener('change', toggleDemoMode);
+        
+        // Personality selection
+        personalityOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                setPersonality(parseInt(option.dataset.personality));
+            });
+        });
+        
+        // Scroll to bottom of chat on load
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    </script>
+</body>
+</html>
